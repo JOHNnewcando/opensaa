@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-win32:
+    runs-on: ubuntu-latest
+    container:
+      image: srteam/mxeposixuc
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Cache build directory
+        uses: actions/cache@v4
+        with:
+          path: build
+          key: ${{ runner.os }}-build-${{ hashFiles('CMakeLists.txt', 'main.cpp', 'symbols.export') }}
+          restore-keys: |
+            ${{ runner.os }}-build-
+
+      - name: Prepare sources
+        shell: bash
+        run: |
+          export PATH="/mxe/usr/bin:$PATH:$GITHUB_WORKSPACE/build"
+          mkdir -p "$GITHUB_WORKSPACE/build"
+          unzip -o samp_saa.zip
+
+      - name: Configure and build
+        shell: bash
+        run: |
+          export PATH="/mxe/usr/bin:$PATH:$GITHUB_WORKSPACE/build"
+          cd "$GITHUB_WORKSPACE/build"
+          i686-w64-mingw32.static.posix-cmake -DCMAKE_BUILD_TYPE=MinSizeRel "$GITHUB_WORKSPACE"
+          make -j"$(nproc --all)"
+
+      - name: Collect build outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/dist"
+
+          asi_path="$(find "$GITHUB_WORKSPACE" -type f -name 'opensaa.asi' -print -quit)"
+          if [ -z "$asi_path" ]; then
+            echo "opensaa.asi was not produced"
+            find "$GITHUB_WORKSPACE" -maxdepth 3 -type f | sort
+            exit 1
+          fi
+
+          cp -v "$asi_path" "$GITHUB_WORKSPACE/dist/"
+          cp -rv "$GITHUB_WORKSPACE/data" "$GITHUB_WORKSPACE/dist/" 2>/dev/null || true
+          cp -rv "$GITHUB_WORKSPACE/MODELS" "$GITHUB_WORKSPACE/dist/" 2>/dev/null || true
+          cp -v "$GITHUB_WORKSPACE/stream.ini" "$GITHUB_WORKSPACE/dist/" 2>/dev/null || true
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: opensaa-win32
+          if-no-files-found: error
+          path: dist/
