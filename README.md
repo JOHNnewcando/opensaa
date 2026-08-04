@@ -12,4 +12,5 @@ Before using OpenSAA, make sure you have:
 - ASI Loader
 - Fastman92 Limit Adjuster
 # Example
+Example of OpenSAA running on open.mp server with the SA-MP 0.3.DL client and expanded vehicle model limits.
 ![OpenSAA Screenshot](images/image.png)
